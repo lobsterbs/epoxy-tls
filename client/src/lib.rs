@@ -231,6 +231,23 @@ enum EpoxyCompression {
 	Gzip,
 }
 
+/// The client identity an embedding engine claims on the wire.
+///
+/// This is a TLS-fingerprint seam, not a user-agent string: the same way
+/// `EpoxyClientOptions::user_agent` picks the HTTP voice, `identity` picks
+/// the ClientHello/h2 voice. `Native` is epoxy's stock rustls shape and the
+/// only identity active today; `Brave` and `Firefox` are reserved profile
+/// names that become live when a matching lyrebird engine release
+/// artifact provides the underlying stack, and selecting one before that
+/// is a no-op that falls back to the native handshake.
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EpoxyIdentity {
+	Native,
+	Brave,
+	Firefox,
+}
+
 // ugly hack. switch to serde-wasm-bindgen or a knockoff
 cfg_if! {
 	if #[cfg(feature = "full")] {
@@ -244,6 +261,7 @@ cfg_if! {
 			pub websocket_protocols: Vec<String>,
 			pub redirect_limit: usize,
 			pub header_limit: usize,
+			pub identity: EpoxyIdentity,
 			#[wasm_bindgen(getter_with_clone)]
 			pub user_agent: String,
 			#[wasm_bindgen(getter_with_clone)]
@@ -261,6 +279,7 @@ cfg_if! {
 			pub websocket_protocols: Vec<String>,
 			pub redirect_limit: usize,
 			pub header_limit: usize,
+			pub identity: EpoxyIdentity,
 			#[wasm_bindgen(getter_with_clone)]
 			pub user_agent: String,
 			pub disable_certificate_validation: bool,
@@ -288,6 +307,7 @@ impl Default for EpoxyClientOptions {
 			websocket_protocols: Vec::new(),
 			redirect_limit: 10,
 			header_limit: 200,
+			identity: EpoxyIdentity::Native,
 			user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36".to_string(),
 			#[cfg(feature = "full")]
 			pem_files: Vec::new(),
