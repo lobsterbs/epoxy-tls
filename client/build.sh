@@ -12,7 +12,8 @@ else
 	CARGOFLAGS=""
 fi
 
-WBG="wasm-bindgen 0.2.100"
+WBG_VERSION=$(awk '$1=="name" && $3=="\"wasm-bindgen\"" {getline; gsub(/version = |"/, ""); print; exit}' ../Cargo.lock)
+WBG="wasm-bindgen $WBG_VERSION"
 if [ "$(wasm-bindgen -V)" != "$WBG" ]; then
 	echo "Incorrect wasm-bindgen version: '$(wasm-bindgen -V)' != '$WBG'"
 	exit 1
