@@ -481,6 +481,10 @@ impl EpoxyClient {
 
 		#[cfg(feature = "full")]
 		builder.http2_max_concurrent_reset_streams(10); // set back to default, on wasm it is 0
+		// Chromium advertises a 32 KiB max frame size; the rest of the
+		// handshake SETTINGS shape is applied by the lobsterbs h2 fork.
+		#[cfg(feature = "full")]
+		builder.http2_max_frame_size(32768);
 		let client = builder.build(service);
 
 		Ok(Self {

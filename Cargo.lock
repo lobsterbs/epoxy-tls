@@ -1170,8 +1170,8 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.7"
-source = "git+https://github.com/r58Playz/h2-wasm#2852a7c94b92f0433a1e2e5107ff4fe56db09cc7"
+version = "0.4.14"
+source = "git+https://github.com/lobsterbs/h2-wasm#f5e115323dfd7ef819fe3e2f2c6a90a51749270c"
 dependencies = [
  "atomic-waker",
  "bytes",
