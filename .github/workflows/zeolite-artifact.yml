@@ -1,0 +1,65 @@
+name: zeolite-artifact
+
+on:
+  push:
+    branches: [multiplexed]
+    paths:
+      - "patches/**"
+      - "tools/apply-rustls.sh"
+      - "epoxy-hello/**"
+      - "client/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build the full transport artifact for the engine
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch pinned rustls and apply patches (fuzz=0)
+        run: sh tools/apply-rustls.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: install wasm-bindgen
+        uses: jetli/wasm-bindgen-action@v0.2.0
+        with:
+          version: "0.2.100"
+
+      - name: setup binaryen (wasm-opt)
+        uses: Aandreba/setup-binaryen@v1.0.0
+        with:
+          token: ${{ github.token }}
+
+      - name: build the full variant (upstream client build.sh, release pipeline)
+        working-directory: client
+        run: RELEASE=1 bash build.sh
+
+      - name: glue carries the identity seam
+        run: grep -q "identity" client/pkg/epoxy.js
+
+      - name: artifact digests
+        working-directory: client/pkg
+        run: |
+          sha256sum epoxy.js epoxy.wasm | tee ../SHA256SUMS
+
+      - name: upload the rolling engine release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: zeolite
+          name: "engine transport artifact (rolling)"
+          commit: multiplexed
+          artifacts: "client/pkg/epoxy.js,client/pkg/epoxy.wasm,client/SHA256SUMS"
+          allowUpdates: true
+          replacesAssets: true
+          body: "Full epoxy transport built from the multiplexed head with the lyrebird patches applied. Consumed by the engine pinned by sha256; epoxy.js/epoxy.wasm shipped as pair."
