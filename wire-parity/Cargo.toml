@@ -1,0 +1,28 @@
+[package]
+name = "wire-parity"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "wire-parity"
+path = "src/main.rs"
+
+[dependencies]
+epoxy-hello = { path = "../epoxy-hello", features = ["aws"] }
+rustls = { path = "../vendor/rustls/rustls", version = "0.23", default-features = false, features = [
+	"std",
+	"ring",
+	"tls12",
+	"brotli",
+	"zlib",
+	"aws-lc-rs",
+	"prefer-post-quantum",
+	"logging",
+] }
+webpki-roots = "1"
+
+[features]
+default = []

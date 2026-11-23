@@ -1,0 +1,30 @@
+[package]
+name = "epoxy-hello"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+rustls = { path = "../vendor/rustls/rustls", version = "0.23", default-features = false, features = [
+	"std",
+	"ring",
+	"tls12",
+	"brotli",
+	"zlib",
+] }
+
+[features]
+default = []
+# Fips-adjacent provider arm for native wire-parity runs: enables the
+# aws-lc provider and the post-quantum-preferring X25519MLKEM768 group.
+# Never enabled by epoxy-client (wasm builds stay on ring).
+aws = [
+	"rustls/aws-lc-rs",
+	"rustls/prefer-post-quantum",
+	"rustls/logging",
+]

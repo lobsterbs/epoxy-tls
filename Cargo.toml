@@ -1,6 +1,18 @@
 [workspace]
 resolver = "2"
-members = ["server", "client", "wisp", "simple-wisp-client"]
+members = [
+	"server",
+	"client",
+	"wisp",
+	"simple-wisp-client",
+	"epoxy-hello",
+	"wire-parity",
+]
+# the vendored rustls monorepo is its own cargo workspace; excluding it
+# lets its crates inherit from vendor/rustls's own root manifest while
+# the [patch.crates-io] entry below still unifies every consumer onto
+# the patched copy.
+exclude = ["vendor"]
 
 [profile.release]
 lto = true
@@ -12,6 +24,10 @@ opt-level = 3
 
 [patch.crates-io]
 h2 = { git = "https://github.com/r58Playz/h2-wasm" }
+# lyrebird-patched rustls: apply patches/*.patch to vendor/rustls first
+# (sh tools/apply-rustls.sh). Base 0.23.46, semver-compatible with the
+# 0.23 lock; the patches add client hello profiles (browser_profiles).
+rustls = { path = "vendor/rustls/rustls" }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }

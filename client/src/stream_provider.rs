@@ -97,6 +97,15 @@ impl StreamProvider {
 			client_config.with_root_certificates(certstore)
 		}
 		.with_no_client_auth();
+		// lyrebird identity shaping: apply the frozen browser profile
+		// when the caller asked for one. On the wasm ring build the
+		// cipher/sig pins degrade to the ring-offerable subset; the
+		// native aws-lc arm (wire-parity) reaches full parity.
+		let identity = epoxy_hello::HelloIdentity::from(options.identity);
+		if let Some(profile) = epoxy_hello::profile(identity) {
+			client_config = client_config.with_client_hello_profile(profile);
+			client_config.cert_decompressors = epoxy_hello::cert_decompressors(identity);
+		}
 		let no_alpn_client_config = Arc::new(client_config.clone());
 		#[cfg(feature = "full")]
 		{

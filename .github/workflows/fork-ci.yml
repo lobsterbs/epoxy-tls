@@ -1,0 +1,85 @@
+name: fork-ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rustls-patches:
+    name: vendored rustls applies byte-strict
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch pinned rustls and apply patches (fuzz=0)
+        run: sh tools/apply-rustls.sh
+
+      - name: patched rustls native check (ring arm)
+        run: cargo check -p rustls --no-default-features --features std,ring,tls12,brotli,zlib
+        working-directory: vendor/rustls
+
+      - name: patches byte-match lyrebird main
+        run: |
+          set -eu
+          for p in patches/*.patch; do
+            name=$(basename "$p")
+            curl -fsSL "https://raw.githubusercontent.com/lobsterbs/lyrebird/main/patches/$name" -o "/tmp/$name"
+            diff -q "$p" "/tmp/$name" || {
+              echo "::error::$name drifts from lobsterbs/lyrebird main"
+              exit 1
+            }
+          done
+          echo "all patches byte-match lyrebird main"
+
+  epoxy-hello:
+    name: epoxy-hello tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch pinned rustls and apply patches (fuzz=0)
+        run: sh tools/apply-rustls.sh
+
+      - name: unit tests
+        run: cargo test -p epoxy-hello
+
+  epoxy-client-wasm:
+    name: epoxy-client wasm32 check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - "--features full"
+          - "--no-default-features"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch pinned rustls and apply patches (fuzz=0)
+        run: sh tools/apply-rustls.sh
+
+      - name: wasm32 check (${{ matrix.features }})
+        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo check -p epoxy-client --target wasm32-unknown-unknown ${{ matrix.features }}
+
+  wire-parity-bin:
+    name: wire-parity native build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch pinned rustls and apply patches (fuzz=0)
+        run: sh tools/apply-rustls.sh
+
+      - name: build (aws-lc arm)
+        run: cargo build -p wire-parity
+
+      - name: usage smoke (bad args exit nonzero)
+        run: |
+          if target/debug/wire-parity; then
+            echo "::error::wire-parity accepted empty args"
+            exit 1
+          fi
+          echo "usage gating ok"

@@ -235,17 +235,30 @@ enum EpoxyCompression {
 ///
 /// This is a TLS-fingerprint seam, not a user-agent string: the same way
 /// `EpoxyClientOptions::user_agent` picks the HTTP voice, `identity` picks
-/// the ClientHello/h2 voice. `Native` is epoxy's stock rustls shape and the
-/// only identity active today; `Brave` and `Firefox` are reserved profile
-/// names that become live when a matching lyrebird engine release
-/// artifact provides the underlying stack, and selecting one before that
-/// is a no-op that falls back to the native handshake.
+/// the ClientHello/h2 voice. `Native` is epoxy's stock rustls shape.
+/// `Brave` and `Firefox` apply the frozen browser ClientHello profiles
+/// from the lyrebird-patched vendored rustls (apply `patches/*.patch` to
+/// `vendor/rustls` first, see README "Fork notes"). Honest caveat: on
+/// this wasm ring build the cipher/signature pins degrade to the
+/// ring-offerable subset and the profile's key-exchange group pin drops
+/// X25519MLKEM768; the native aws-lc arm (the `wire-parity` crate) is
+/// the configuration that reaches full browser parity.
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EpoxyIdentity {
 	Native,
 	Brave,
 	Firefox,
+}
+
+impl From<EpoxyIdentity> for epoxy_hello::HelloIdentity {
+	fn from(id: EpoxyIdentity) -> Self {
+		match id {
+			EpoxyIdentity::Native => epoxy_hello::HelloIdentity::Native,
+			EpoxyIdentity::Brave => epoxy_hello::HelloIdentity::Brave,
+			EpoxyIdentity::Firefox => epoxy_hello::HelloIdentity::Firefox,
+		}
+	}
 }
 
 // ugly hack. switch to serde-wasm-bindgen or a knockoff

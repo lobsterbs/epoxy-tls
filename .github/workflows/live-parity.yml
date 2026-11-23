@@ -1,0 +1,35 @@
+name: live-parity
+
+on:
+  schedule:
+    # 03:41 UTC nightly, off the hour to dodge peak
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  peet:
+    name: live ja4 parity vs tls.peet.ws
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch pinned rustls and apply patches (fuzz=0)
+        run: sh tools/apply-rustls.sh
+
+      - name: build wire-parity (aws-lc arm)
+        run: cargo build -p wire-parity
+
+      - name: brave handshake must match the captured ja4
+        run: |
+          target/debug/wire-parity brave tls.peet.ws 443 /api/all \
+            --expect-ja4 t13d916h2_f91f431d341e_806a8c22fdea > /tmp/brave.json
+          grep -o '"ja4": *"t13d[^"]*"' /tmp/brave.json || true
+
+      - name: firefox handshake must match the captured ja4
+        run: |
+          target/debug/wire-parity firefox tls.peet.ws 443 /api/all \
+            --expect-ja4 t13d916h2_f91f431d341e_ba4afa82cbcb > /tmp/firefox.json
+          grep -o '"ja4": *"t13d[^"]*"' /tmp/firefox.json || true

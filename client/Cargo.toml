@@ -13,6 +13,7 @@ crate-type = ["cdylib"]
 async-compression = { version = "0.4.12", features = ["futures-io", "gzip", "brotli"], optional = true }
 bytes = "1.7.1"
 cfg-if = "1.0.0"
+epoxy-hello = { path = "../epoxy-hello", default-features = false }
 event-listener = "5.3.1"
 fastwebsockets = { version = "0.10.0", features = ["unstable-split"], optional = true }
 flume = "0.11.0"
