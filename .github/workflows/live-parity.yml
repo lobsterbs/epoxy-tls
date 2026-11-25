@@ -25,11 +25,33 @@ jobs:
       - name: brave handshake must match the captured ja4
         run: |
           target/debug/wire-parity brave tls.peet.ws 443 /api/all \
-            --expect-ja4 t13d916h2_f91f431d341e_806a8c22fdea > /tmp/brave.json
-          grep -o '"ja4": *"t13d[^"]*"' /tmp/brave.json || true
+            --expect-ja4 t13d914h2_f91f431d341e_9682305a41b3 > /tmp/brave.json
+          grep -o '"ja4": *"t13d[^"]*' /tmp/brave.json || true
 
       - name: firefox handshake must match the captured ja4
         run: |
           target/debug/wire-parity firefox tls.peet.ws 443 /api/all \
-            --expect-ja4 t13d916h2_f91f431d341e_ba4afa82cbcb > /tmp/firefox.json
-          grep -o '"ja4": *"t13d[^"]*"' /tmp/firefox.json || true
+            --expect-ja4 t13d914h2_f91f431d341e_d7d6985f8b1b > /tmp/firefox.json
+          grep -o '"ja4": *"t13d[^"]*' /tmp/firefox.json || true
+
+      - name: brave must survive real parsing servers (2026-11-25 regression)
+        # tls.peet.ws never parsed ALPS/DC/SCT, so a green peet leg
+        # shipped an offer that killed every real handshake (fully
+        # convicted on wire captures; fixed by dropping the
+        # structurally-unofferable statics, ad1ef42). These legs are
+        # the real-server proof: rc=0 means the full TLS round-trip
+        # completed against a server that actively consumes the
+        # ClientHello. example.com fronts Cloudflare (delegated
+        # credentials down that path), google.com negotiates ALPS
+        # when offered and aborts without a client implementation -
+        # both regress here the moment the static offers return.
+        run: |
+          set -e
+          target/debug/wire-parity brave example.com 443 / >/dev/null
+          target/debug/wire-parity brave google.com 443 / >/dev/null
+
+      - name: firefox must survive real parsing servers (2026-11-25 regression)
+        run: |
+          set -e
+          target/debug/wire-parity firefox example.com 443 / >/dev/null
+          target/debug/wire-parity firefox google.com 443 / >/dev/null
