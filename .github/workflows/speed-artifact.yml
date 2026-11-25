@@ -54,16 +54,16 @@ jobs:
       - name: size variant stays simd-free (bulk-memory is present upstream, informational)
         run: |
           wasm-dis client/pkg-size/epoxy.wasm -o "$RUNNER_TEMP/size.dis"
-          hits_simd=$(grep -cE 'v128|i8x16|i16x8|i32x4|i64x2|f32x4|f64x2' "$RUNNER_TEMP/size.dis")
-          bulk_lines=$(grep -cE 'memory\.(fill|copy|init)' "$RUNNER_TEMP/size.dis")
+          hits_simd=$(grep -cE 'v128|i8x16|i16x8|i32x4|i64x2|f32x4|f64x2' "$RUNNER_TEMP/size.dis" || true)
+          bulk_lines=$(grep -cE 'memory\.(fill|copy|init)' "$RUNNER_TEMP/size.dis" || true)
           echo "size variant simd instruction lines: $hits_simd (bulk-memory instruction lines present: $bulk_lines, informational)"
           test "$hits_simd" -eq 0
 
       - name: speed variant actually uses SIMD and bulk-memory
         run: |
           wasm-dis client/pkg/epoxy.wasm -o "$RUNNER_TEMP/speed.dis"
-          hits_simd=$(grep -cE 'v128|i8x16|i16x8|i32x4|i64x2|f32x4|f64x2' "$RUNNER_TEMP/speed.dis")
-          hits_bulk=$(grep -cE 'memory\.(fill|copy|init)' "$RUNNER_TEMP/speed.dis")
+          hits_simd=$(grep -cE 'v128|i8x16|i16x8|i32x4|i64x2|f32x4|f64x2' "$RUNNER_TEMP/speed.dis" || true)
+          hits_bulk=$(grep -cE 'memory\.(fill|copy|init)' "$RUNNER_TEMP/speed.dis" || true)
           echo "simd instruction lines: $hits_simd"
           echo "bulk-memory instruction lines: $hits_bulk"
           test "$hits_simd" -gt 0
