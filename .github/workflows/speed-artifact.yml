@@ -1,0 +1,96 @@
+name: speed-artifact
+
+on:
+  push:
+    branches: [speed-build]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build both variants and prove the speed features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch pinned rustls and apply patches (fuzz=0)
+        run: sh tools/apply-rustls.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: install wasm-bindgen
+        uses: jetli/wasm-bindgen-action@v0.2.0
+        with:
+          version: "0.2.100"
+
+      - name: setup binaryen (wasm-opt, wasm2wat)
+        uses: Aandreba/setup-binaryen@v1.0.0
+        with:
+          token: ${{ github.token }}
+
+      - name: build the size variant (must stay mvp + size-optimized)
+        working-directory: client
+        run: |
+          RELEASE=1 bash build.sh
+          cp -r pkg ../pkg-size
+
+      - name: reset for the speed variant
+        working-directory: client
+        run: rm -r pkg
+
+      - name: build the speed variant (default std, bulk-memory, sign-ext, SIMD128)
+        working-directory: client
+        run: RELEASE=1 SPEED=1 bash build.sh
+
+      - name: glue carries the identity seam in both variants
+        run: |
+          grep -q "identity" client/pkg/epoxy.js
+          grep -q "identity" client/pkg-size/epoxy.js
+
+      - name: size variant is still mvp baseline (no v128, no bulk-memory ops)
+        run: |
+          if wasm2wat client/pkg-size/epoxy.wasm | grep -q 'v128\.'; then
+            echo "::error::size artifact gained SIMD instructions"; exit 1
+          fi
+          if wasm2wat client/pkg-size/epoxy.wasm | grep -q 'memory\.fill\|memory\.init'; then
+            echo "::error::size artifact gained bulk-memory instructions"; exit 1
+          fi
+
+      - name: speed variant actually uses SIMD and bulk-memory
+        run: |
+          w=$(mktemp -d)
+          hits_v128=$(wasm2wat client/pkg/epoxy.wasm | grep -c 'v128\.')
+          hits_bulk=$(wasm2wat client/pkg/epoxy.wasm | grep -cE 'memory\.(fill|init|copy)')
+          echo "v128 instruction lines: $hits_v128"
+          echo "bulk-memory instruction lines: $hits_bulk"
+          test "$hits_v128" -gt 0
+          test "$hits_bulk" -gt 0
+
+      - name: both modules validate in a js engine
+        run: |
+          node -e "
+            const fs = require('fs');
+            for (const p of ['client/pkg/epoxy.wasm', 'client/pkg-size/epoxy.wasm']) {
+              const bytes = new Uint8Array(fs.readFileSync(p));
+              if (!WebAssembly.validate(bytes)) { throw new Error(p + ' does not validate'); }
+              console.log(p + ' validates (' + bytes.length + ' bytes)');
+            }
+          "
+
+      - name: digests and sizes
+        working-directory: client
+        run: |
+          sha256sum pkg/epoxy.js pkg/epoxy.wasm pkg-size/epoxy.js pkg-size/epoxy.wasm
+          ls -l pkg pkg-size
+
+      - name: upload both variants as workflow artifacts (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: epoxy-speed-variant
+          path: |
+            client/pkg/
+            client/pkg-size/
