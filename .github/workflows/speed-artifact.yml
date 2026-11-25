@@ -27,7 +27,7 @@ jobs:
         with:
           version: "0.2.100"
 
-      - name: setup binaryen (wasm-opt, wasm2wat)
+      - name: setup binaryen (wasm-opt, wasm-dis)
         uses: Aandreba/setup-binaryen@v1.0.0
         with:
           token: ${{ github.token }}
@@ -51,23 +51,25 @@ jobs:
           grep -q "identity" client/pkg/epoxy.js
           grep -q "identity" client/pkg-size/epoxy.js
 
-      - name: size variant is still mvp baseline (no v128, no bulk-memory ops)
+      - name: size variant is still mvp baseline (no simd, no bulk-memory ops)
         run: |
-          if wasm2wat client/pkg-size/epoxy.wasm | grep -q 'v128\.'; then
+          wasm-dis client/pkg-size/epoxy.wasm -o "$RUNNER_TEMP/size.dis"
+          if grep -qE 'v128|i8x16|i16x8|i32x4|i64x2|f32x4|f64x2' "$RUNNER_TEMP/size.dis"; then
             echo "::error::size artifact gained SIMD instructions"; exit 1
           fi
-          if wasm2wat client/pkg-size/epoxy.wasm | grep -q 'memory\.fill\|memory\.init'; then
+          if grep -qE 'memory\.(fill|copy|init)' "$RUNNER_TEMP/size.dis"; then
             echo "::error::size artifact gained bulk-memory instructions"; exit 1
           fi
+          echo "size variant is clean mvp: no simd, no bulk-memory ops"
 
       - name: speed variant actually uses SIMD and bulk-memory
         run: |
-          w=$(mktemp -d)
-          hits_v128=$(wasm2wat client/pkg/epoxy.wasm | grep -c 'v128\.')
-          hits_bulk=$(wasm2wat client/pkg/epoxy.wasm | grep -cE 'memory\.(fill|init|copy)')
-          echo "v128 instruction lines: $hits_v128"
+          wasm-dis client/pkg/epoxy.wasm -o "$RUNNER_TEMP/speed.dis"
+          hits_simd=$(grep -cE 'v128|i8x16|i16x8|i32x4|i64x2|f32x4|f64x2' "$RUNNER_TEMP/speed.dis")
+          hits_bulk=$(grep -cE 'memory\.(fill|copy|init)' "$RUNNER_TEMP/speed.dis")
+          echo "simd instruction lines: $hits_simd"
           echo "bulk-memory instruction lines: $hits_bulk"
-          test "$hits_v128" -gt 0
+          test "$hits_simd" -gt 0
           test "$hits_bulk" -gt 0
 
       - name: both modules validate in a js engine
