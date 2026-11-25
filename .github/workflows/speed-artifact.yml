@@ -36,7 +36,7 @@ jobs:
         working-directory: client
         run: |
           RELEASE=1 bash build.sh
-          cp -r pkg ../pkg-size
+          cp -r pkg pkg-size
 
       - name: reset for the speed variant
         working-directory: client
@@ -64,7 +64,8 @@ jobs:
         run: |
           w=$(mktemp -d)
           hits_v128=$(wasm2wat client/pkg/epoxy.wasm | grep -c 'v128\.')
-          hits_bulk=$(wasm2wat client/pkg/epoxy.wasm | grep -cE 'memory\.(fill|init|copy)')
+          hits_bulk=$(wasm2wat
+ client/pkg/epoxy.wasm | grep -cE 'memory\.(fill|init|copy)')
           echo "v128 instruction lines: $hits_v128"
           echo "bulk-memory instruction lines: $hits_bulk"
           test "$hits_v128" -gt 0
