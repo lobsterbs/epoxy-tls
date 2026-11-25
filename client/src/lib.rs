@@ -14,7 +14,7 @@ use http::{
 	},
 	method::InvalidMethod,
 	uri::{InvalidUri, InvalidUriParts},
-	HeaderName, HeaderValue, Method, Request, Response,
+	HeaderMap, HeaderName, HeaderValue, Method, Request, Response,
 };
 use http_body::Body;
 use http_body_util::{BodyDataStream, Full};
@@ -225,9 +225,39 @@ enum EpoxyResponse {
 	Redirect((Response<Incoming>, http::Request<StreamingBody>)),
 }
 
+/// Engine defaults fill the tail of the header map, after the page own
+/// headers, so the order on the wire matches where a real browser puts
+/// them (Zeolite #718). The page always wins on content-type: the body
+/// derived content-type only fills a slot the page left unset. The user
+/// agent stays profile-authoritative.
+fn insert_default_headers(
+	headers_map: &mut HeaderMap,
+	user_agent: &str,
+	body_content_type: Option<&str>,
+) -> Result<(), EpoxyError> {
+	headers_map.insert(USER_AGENT, HeaderValue::from_str(user_agent)?);
+	if let Some(content_type) = body_content_type {
+		headers_map
+			.entry(CONTENT_TYPE)
+			.or_insert(HeaderValue::from_str(content_type)?);
+	}
+	// Advertise only what the decoders in fetch() answer. Real Chrome
+	// also sends zstd from 123 on; that waits on a wasm32-safe
+	// decompressor and stays tracked in lobsterbs/Zeolite #718.
+	cfg_if! {
+		if #[cfg(feature = "full")] {
+			headers_map.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip, deflate, br"));
+		} else {
+			headers_map.insert(ACCEPT_ENCODING, HeaderValue::from_static("identity"));
+		}
+	}
+	headers_map.insert(CONNECTION, HeaderValue::from_static("keep-alive"));
+	Ok(())
+}
 #[cfg(feature = "full")]
 enum EpoxyCompression {
 	Brotli,
+	Deflate,
 	Gzip,
 }
 
@@ -670,20 +700,6 @@ impl EpoxyClient {
 			.headers_mut()
 			.ok_or(EpoxyError::InvalidRequest)?;
 
-		cfg_if! {
-			if #[cfg(feature = "full")] {
-				headers_map.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip, br"));
-			} else {
-				headers_map.insert(ACCEPT_ENCODING, HeaderValue::from_static("identity"));
-			}
-		}
-		headers_map.insert(CONNECTION, HeaderValue::from_static("keep-alive"));
-		headers_map.insert(USER_AGENT, HeaderValue::from_str(&self.user_agent)?);
-
-		if let Some(content_type) = body_content_type {
-			headers_map.insert(CONTENT_TYPE, HeaderValue::from_str(&content_type)?);
-		}
-
 		if let Some(headers) = headers {
 			for hdr in headers {
 				if ["host"].contains(&hdr[0].to_lowercase().as_str()) {
@@ -695,6 +711,8 @@ impl EpoxyClient {
 				);
 			}
 		}
+
+		insert_default_headers(headers_map, &self.user_agent, body_content_type.as_deref())?;
 
 		let body_empty = if let http_body_util::Either::Right(ref x) = body {
 			x.size_hint().exact().unwrap_or(1) == 0
@@ -747,14 +765,18 @@ impl EpoxyClient {
 					{
 						"gzip" => Some(EpoxyCompression::Gzip),
 						"br" => Some(EpoxyCompression::Brotli),
+						"deflate" => Some(EpoxyCompression::Deflate),
 						_ => None,
 					};
 
 					let response_body = BodyDataStream::new(response.into_body()).map_err(std::io::Error::other).into_async_read();
 					let decompressed_body = match compression {
 						Some(alg) => match alg {
+							EpoxyCompression::Deflate => {
+								Either::Left(Either::Left(Either::Left(async_comp::DeflateDecoder::new(response_body))))
+							}
 							EpoxyCompression::Gzip => {
-								Either::Left(Either::Left(async_comp::GzipDecoder::new(response_body)))
+								Either::Left(Either::Left(Either::Right(async_comp::GzipDecoder::new(response_body))))
 							}
 							EpoxyCompression::Brotli => {
 								Either::Left(Either::Right(async_comp::BrotliDecoder::new(response_body)))
@@ -803,5 +825,41 @@ impl EpoxyClient {
 		utils::define_property(&resp, "rawHeaders", raw_headers.into());
 
 		Ok(resp)
+	}
+}
+
+#[cfg(test)]
+mod request_header_tests {
+	use super::*;
+
+	#[test]
+	fn page_headers_lead_and_engine_defaults_fill_the_tail() {
+		let mut m = HeaderMap::new();
+		m.insert(HeaderName::from_static("sec-fetch-site"), HeaderValue::from_static("same-origin"));
+		m.insert(HeaderName::from_static("referer"), HeaderValue::from_static("https://accounts.example.com/"));
+		insert_default_headers(&mut m, "TestUA", Some("text/plain")).unwrap();
+		let names: Vec<&str> = m.keys().map(|k| k.as_str()).collect();
+		assert_eq!(
+			names,
+			["sec-fetch-site", "referer", "user-agent", "content-type", "accept-encoding", "connection"]
+		);
+	}
+
+	#[test]
+	fn accept_encoding_advertises_only_decodable_algorithms() {
+		let mut m = HeaderMap::new();
+		insert_default_headers(&mut m, "TestUA", None).unwrap();
+		let want = if cfg!(feature = "full") { "gzip, deflate, br" } else { "identity" };
+		assert_eq!(m.get(ACCEPT_ENCODING).unwrap(), &HeaderValue::from_static(want));
+	}
+
+	#[test]
+	fn page_content_type_wins_over_the_body_default() {
+		let mut m = HeaderMap::new();
+		m.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+		insert_default_headers(&mut m, "TestUA", Some("text/plain")).unwrap();
+		assert_eq!(m.get(CONTENT_TYPE).unwrap(), &HeaderValue::from_static("application/json"));
+		let names: Vec<&str> = m.keys().map(|k| k.as_str()).collect();
+		assert_eq!(names.first(), Some(&"content-type"));
 	}
 }
