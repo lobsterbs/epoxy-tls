@@ -31,7 +31,7 @@ jobs:
       - name: firefox handshake must match the captured ja4
         run: |
           target/debug/wire-parity firefox tls.peet.ws 443 /api/all \
-            --expect-ja4 t13d914h2_f91f431d341e_d7d6985f8b1b > /tmp/firefox.json
+            --expect-ja4 t13d914h2_f91f431d341e_d7d6985f8b1a > /tmp/firefox.json
           grep -o '"ja4": *"t13d[^"]*' /tmp/firefox.json || true
 
       - name: brave must survive real parsing servers (2026-11-25 regression)
