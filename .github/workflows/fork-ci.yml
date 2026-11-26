@@ -92,7 +92,7 @@ jobs:
       - name: brave handshake must match the pinned ja4
         run: |
           target/debug/wire-parity brave tls.peet.ws 443 /api/all \
-            --expect-ja4 t13d914h2_f91f431d341e_9682305a41b4 > /tmp/brave.json
+            --expect-ja4 t13d914h2_f91f431d341e_9682305a41b3 > /tmp/brave.json
           grep -o '"ja4": *"t13d[^"]*' /tmp/brave.json || true
 
       - name: firefox handshake must match the pinned ja4
