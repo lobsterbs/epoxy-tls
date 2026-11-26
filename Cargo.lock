@@ -798,6 +798,7 @@ dependencies = [
  "futures-rustls",
  "futures-util",
  "getrandom 0.2.16",
+ "h2",
  "http",
  "http-body",
  "http-body-util",
@@ -1171,7 +1172,7 @@ dependencies = [
 [[package]]
 name = "h2"
 version = "0.4.14"
-source = "git+https://github.com/lobsterbs/h2-wasm#f5e115323dfd7ef819fe3e2f2c6a90a51749270c"
+source = "git+https://github.com/lobsterbs/h2-wasm#5d57b1d1c7629977f19191cdbeaa78bb08197ded"
 dependencies = [
  "atomic-waker",
  "bytes",

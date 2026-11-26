@@ -515,6 +515,25 @@ impl EpoxyClient {
 		// handshake SETTINGS shape is applied by the lobsterbs h2 fork.
 		#[cfg(feature = "full")]
 		builder.http2_max_frame_size(32768);
+
+		// Per-identity h2 wire profile (lyrebird capture-truth): the
+		// lobsterbs h2 fork reads the process-global profile at client
+		// handshake time. Native keeps the Chromium-compatible shape epoxy
+		// has shipped since 2026-11-23; Brave and Firefox apply the
+		// capture-pinned handshake shapes from lobsterbs/lyrebird
+		// tools/capture/h2shapes.py (seed SETTINGS order, handshake
+		// connection WINDOW_UPDATE, request pseudo-header order, HEADERS
+		// PRIORITY payload).
+		#[cfg(feature = "full")]
+		{
+			let profile = match options.identity {
+				EpoxyIdentity::Native => h2::client::ClientWireProfile::Chromium,
+				EpoxyIdentity::Brave => h2::client::ClientWireProfile::Brave,
+				EpoxyIdentity::Firefox => h2::client::ClientWireProfile::Firefox,
+			};
+			h2::client::set_client_wire_profile(profile);
+		}
+
 		let client = builder.build(service);
 
 		Ok(Self {

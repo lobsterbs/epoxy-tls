@@ -19,6 +19,10 @@ fastwebsockets = { version = "0.10.0", features = ["unstable-split"], optional =
 flume = "0.11.0"
 futures-rustls = { version = "0.26.0", default-features = false, features = ["tls12", "ring"] }
 futures-util = { version = "0.3.30", features = ["sink"] }
+# direct dep so the client can set the lobsterbs h2 fork's process-global
+# wire profile (per-identity handshake shape); resolves to the fork via the
+# [patch.crates-io] table. Optional: http2-only, tied to "full".
+h2 = { version = "0.4.14", optional = true }
 http = "1.1.0"
 http-body = "1.0.1"
 http-body-util = "0.1.2"
@@ -60,5 +64,5 @@ features = ["wasm-bindgen"]
 
 [features]
 default = ["full"]
-full = ["dep:fastwebsockets", "dep:async-compression", "dep:rustls-webpki", "dep:rustls-pemfile", "hyper-util-wasm/http2"]
+full = ["dep:fastwebsockets", "dep:async-compression", "dep:rustls-webpki", "dep:rustls-pemfile", "dep:h2", "hyper-util-wasm/http2"]
 
