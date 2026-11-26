@@ -69,6 +69,9 @@ impl StreamProvider {
 		wisp_generator: ProviderWispTransportGenerator,
 		options: &EpoxyClientOptions,
 	) -> Result<Self, EpoxyError> {
+		#[cfg(feature = "aws")]
+		let provider = Arc::new(futures_rustls::rustls::crypto::aws_lc_rs::default_provider());
+		#[cfg(not(feature = "aws"))]
 		let provider = Arc::new(futures_rustls::rustls::crypto::ring::default_provider());
 		let client_config = ClientConfig::builder_with_provider(provider.clone())
 			.with_safe_default_protocol_versions()?;

@@ -45,8 +45,9 @@ use wisp_mux::{
 use ws_wrapper::WebSocketWrapper;
 
 mod io_stream;
-mod stream_provider;
-mod tokioio;
+#[cfg(all(feature = "aws", target_arch = "wasm32", target_os = "unknown"))]
+mod aws_wasm_libc;
+mod stream_provider;mod tokioio;
 mod utils;
 #[cfg(feature = "full")]
 mod websocket;

@@ -60,5 +60,8 @@ features = ["wasm-bindgen"]
 
 [features]
 default = ["full"]
+# aws-lc crypto provider arm for the wasm client: same identity seam, full
+# provider expressibility (X25519MLKEM768 + the 09xx sig family ring drops).
+aws = ["epoxy-hello/aws"]
 full = ["dep:fastwebsockets", "dep:async-compression", "dep:rustls-webpki", "dep:rustls-pemfile", "hyper-util-wasm/http2"]
 

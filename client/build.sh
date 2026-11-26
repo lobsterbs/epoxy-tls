@@ -31,6 +31,13 @@ else
 	cargo build --target wasm32-unknown-unknown -Z build-std=panic_abort,std -Z build-std-features=optimize_for_size --release $CARGOFLAGS "$@"
 fi
 echo "[epx] cargo finished"
+# aws-lc registers an exit-time destructor; wasm-bindgen 0.2.100 runs
+# __wasm_call_ctors in its descriptor interpreter and cannot execute
+# block/br_if. The registration is a no-op for us, so empty that one
+# function body before bindgen. No-op when the function is absent.
+python3 ../patch_dtors.py \
+	../target/wasm32-unknown-unknown/release/epoxy_client.wasm \
+	../target/wasm32-unknown-unknown/release/epoxy_client.wasm
 wasm-bindgen --target web --out-dir out/ ../target/wasm32-unknown-unknown/release/epoxy_client.wasm
 echo "[epx] wasm-bindgen finished"
 
